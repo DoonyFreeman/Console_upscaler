@@ -85,8 +85,6 @@ pip install -e .
 upscale
 ```
 
-<!-- TODO: положить скриншот интерактивного режима в docs/images/interactive.png -->
-
 ![interactive mode](docs/images/interactive.png)
 
 ### Прямые команды
