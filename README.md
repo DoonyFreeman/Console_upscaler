@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/python-3.10--3.12-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)](#установка)
 [![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-MPS-orange?logo=apple)](https://developer.apple.com/metal/pytorch/)
-[![License](https://img.shields.io/badge/license-MIT-green)](#лицензия)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Status](https://img.shields.io/badge/status-pet%20project-ff69b4)](#)
 
 Маленький домашний инструмент: увеличивает разрешение фотографий в 2 или 4 раза с помощью нейросети [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN), восстанавливает детали и резкость, а портреты опционально докручивает через [GFPGAN](https://github.com/TencentARC/GFPGAN). Всё локально, на вашем железе.
@@ -224,6 +224,4 @@ PR-ы и issue приветствуются — это пет-проект, вс
 
 ## 📄 Лицензия
 
-MIT. Делайте что хотите, только не забудьте про лицензии моделей (Real-ESRGAN — BSD 3-Clause, GFPGAN — Apache 2.0).
-
-<!-- TODO: добавить файл LICENSE в корень репозитория -->
+[MIT](LICENSE). Делайте что хотите, только не забудьте про лицензии моделей (Real-ESRGAN — BSD 3-Clause, GFPGAN — Apache 2.0).
