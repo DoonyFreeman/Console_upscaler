@@ -14,8 +14,6 @@
 
 ## ✨ Демо: до и после
 
-<!-- TODO: положить картинки в docs/images/ (before.jpg / after.jpg / portrait_before.jpg / portrait_after.jpg) -->
-
 | До | После (`upscale photo.jpg`) |
 |:---:|:---:|
 | ![before](docs/images/before.jpg) | ![after](docs/images/after.jpg) |
