@@ -1,0 +1,27 @@
+# Agent
+/.claude
+/CLAUDE.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Runtime caches (models, GFPGAN weights)
+gfpgan/
+models/
+*.pth
