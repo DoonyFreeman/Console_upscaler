@@ -427,16 +427,35 @@ class MainWindow(QWidget):
                              int(self.quality_cb.currentText().replace("%", "")),
                              self.face_cb.isChecked())
         self.worker.moveToThread(self.thread)
+        # ВАЖНО: все обновления UI — только в главном потоке. Подключаем сигналы
+        # рабочего потока к методам-слотам через QueuedConnection, иначе Qt может
+        # выполнить обработчик прямо в рабочем потоке → segfault при перерисовке.
         self.thread.started.connect(self.worker.run)
-        self.worker.status.connect(self.status.setText)
-        self.worker.progress.connect(lambda v: self.pbar.setValue(int(v * 1000)))
-        self.worker.file_done.connect(lambda k, t: self._mark(k, t, "#157F3B"))
-        self.worker.file_fail.connect(lambda k, t: self._mark(k, t, "#CF222E"))
-        self.worker.finished.connect(self._finished)
-        self.worker.error.connect(self._error)
+        self.worker.status.connect(self._on_status, Qt.QueuedConnection)
+        self.worker.progress.connect(self._on_progress, Qt.QueuedConnection)
+        self.worker.file_done.connect(self._on_done, Qt.QueuedConnection)
+        self.worker.file_fail.connect(self._on_fail, Qt.QueuedConnection)
+        self.worker.finished.connect(self._finished, Qt.QueuedConnection)
+        self.worker.error.connect(self._error, Qt.QueuedConnection)
         self.worker.finished.connect(self.thread.quit)
         self.worker.error.connect(self.thread.quit)
         self.thread.start()
+
+    @Slot(str)
+    def _on_status(self, text):
+        self.status.setText(text)
+
+    @Slot(float)
+    def _on_progress(self, v):
+        self.pbar.setValue(int(v * 1000))
+
+    @Slot(str, str)
+    def _on_done(self, key, text):
+        self._mark(key, text, "#157F3B")
+
+    @Slot(str, str)
+    def _on_fail(self, key, text):
+        self._mark(key, text, "#CF222E")
 
     def _mark(self, key, text, color):
         row = self.rows.get(key)
