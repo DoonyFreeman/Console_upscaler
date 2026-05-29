@@ -1,449 +1,474 @@
-"""Графический интерфейс Upscaler на нативном tkinter/ttk (тема clam).
+"""Графический интерфейс Upscaler на PySide6 (Qt).
 
-Нативный ttk рисуется надёжно на macOS (в отличие от customtkinter, который
-на этой связке Python/Tk даёт пустое окно). Тема clam полностью стилизуется —
-делаем аккуратный плоский дизайн с акцентом, миниатюрами и drag-and-drop.
+Qt рисуется надёжно на современных macOS (в отличие от tkinter, который на
+macOS 26 либо не отрисовывается, либо падает), даёт нативный drag-and-drop
+и полноценную стилизацию.
 """
-import queue
-import subprocess
-import threading
+import sys
 import traceback
 from pathlib import Path
-from tkinter import Tk, StringVar, BooleanVar, filedialog, ttk
-import tkinter as tk
 
-from PIL import Image, ImageOps, ImageTk
-
-try:
-    from tkinterdnd2 import DND_FILES, TkinterDnD
-    _DND_IMPORTED = True
-except Exception:
-    _DND_IMPORTED = False
+from PySide6.QtCore import Qt, QObject, QThread, Signal, Slot, QSize
+from PySide6.QtGui import QPixmap, QIcon, QPainter, QPainterPath, QColor
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QLabel, QPushButton, QComboBox, QCheckBox,
+    QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QFileDialog,
+    QListWidget, QListWidgetItem, QProgressBar, QButtonGroup,
+    QGraphicsDropShadowEffect,
+)
 
 from upscaler.utils import collect_images, get_image_info, make_output_path
 
-# --------------------------------- палитра (светлая, плоская) --------------
-WIN     = "#EDEFF3"
-CARD    = "#FFFFFF"
-ROW     = "#F5F6F8"
-BORDER  = "#DCE0E6"
-TEXT    = "#1B1F24"
-MUTED   = "#6B7280"
-ACCENT  = "#2F6FED"
-ACCENT_HV = "#2559C4"
-DROP_BG = "#F4F7FD"
-OK      = "#157F3B"
-ERR     = "#CF222E"
-
-FONT = "SF Pro Display"
-FONT_TX = "SF Pro Text"
-
+ACCENT = "#2F6FED"
 FORMATS = ["Как оригинал", "JPEG", "PNG", "WebP"]
 FORMAT_MAP = {"Как оригинал": None, "JPEG": "jpg", "PNG": "png", "WebP": "webp"}
 QUALITIES = ["95%", "85%", "100%"]
+EXTS = ("*.jpg", "*.jpeg", "*.png", "*.webp", "*.tiff", "*.tif", "*.bmp")
+
+STYLE = """
+#window { background: #ECEEF2; }
+#title { font-size: 26px; font-weight: 800; color: #161A20; }
+#subtitle { font-size: 13px; color: #6B7280; }
+#badge { background: #E6EEFE; color: #2F6FED; font-size: 11px; font-weight: 700;
+         border-radius: 8px; padding: 4px 8px; }
+
+#drop { background: #F3F7FE; border: 2px dashed #B9CBF2; border-radius: 16px; }
+#drop[hover="true"] { background: #E6EEFE; border: 2px dashed #2F6FED; }
+#dropChip { background: #E1ECFE; color: #2F6FED; font-size: 22px; font-weight: 800;
+            border-radius: 24px; min-width: 48px; max-width: 48px;
+            min-height: 48px; max-height: 48px; }
+#dropTitle { font-size: 14px; font-weight: 700; color: #1B1F24; }
+#dropSub { font-size: 12px; color: #6B7280; }
+
+#card { background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 16px; }
+#rowLabel { font-size: 13px; color: #1B1F24; }
+
+QPushButton#accent { background: #2F6FED; color: white; border: none;
+    border-radius: 11px; padding: 13px 18px; font-size: 15px; font-weight: 700; }
+QPushButton#accent:hover { background: #2559C4; }
+QPushButton#accent:disabled { background: #A9C2F4; }
+
+QPushButton#secondary { background: #FFFFFF; color: #1B1F24; border: 1px solid #DCE0E6;
+    border-radius: 10px; padding: 9px 14px; font-size: 13px; }
+QPushButton#secondary:hover { background: #EEF1F5; }
+
+QPushButton#ghost { background: transparent; color: #6B7280; border: none;
+    border-radius: 10px; padding: 9px 12px; font-size: 13px; }
+QPushButton#ghost:hover { background: #E1E4EA; }
+
+QPushButton#seg { background: #F4F5F8; color: #1B1F24; border: 1px solid #DCE0E6;
+    padding: 6px 18px; font-size: 13px; font-weight: 700; }
+QPushButton#seg:checked { background: #2F6FED; color: white; border: 1px solid #2F6FED; }
+QPushButton#seg[side="L"] { border-top-left-radius: 9px; border-bottom-left-radius: 9px; }
+QPushButton#seg[side="R"] { border-top-right-radius: 9px; border-bottom-right-radius: 9px; }
+
+QComboBox { background: #F4F5F8; color: #1B1F24; border: none; border-radius: 9px;
+    padding: 7px 12px; font-size: 13px; min-width: 130px; }
+QComboBox::drop-down { border: none; width: 22px; }
+QComboBox QAbstractItemView { background: white; color: #1B1F24;
+    selection-background-color: #2F6FED; selection-color: white; outline: none; }
+
+QCheckBox { font-size: 13px; color: #1B1F24; spacing: 8px; }
+QCheckBox::indicator { width: 20px; height: 20px; border-radius: 6px;
+    border: 1px solid #C3C8D0; background: white; }
+QCheckBox::indicator:checked { background: #2F6FED; border: 1px solid #2F6FED; }
+
+#list { background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 16px;
+    outline: none; padding: 6px; }
+#list::item { border: none; margin: 0; }
+#fileRow { background: #F6F7F9; border-radius: 12px; }
+#fileName { font-size: 13px; font-weight: 700; color: #1B1F24; }
+#fileDim { font-size: 11px; color: #6B7280; }
+#fileStatus { font-size: 12px; font-weight: 700; color: #6B7280; }
+#empty { font-size: 13px; color: #9AA0AA; }
+
+#status { font-size: 12px; color: #6B7280; }
+
+QProgressBar { background: #DCE0E6; border: none; border-radius: 4px; height: 8px; text-align: center; }
+QProgressBar::chunk { background: #2F6FED; border-radius: 4px; }
+
+QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
+QScrollBar::handle:vertical { background: #C3C8D0; border-radius: 5px; min-height: 30px; }
+QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
+QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+"""
 
 
-def _make_root():
-    if _DND_IMPORTED:
+class Worker(QObject):
+    status = Signal(str)
+    progress = Signal(float)
+    file_done = Signal(str, str)
+    file_fail = Signal(str, str)
+    finished = Signal(int, str)
+    error = Signal(str)
+
+    def __init__(self, files, scale, fmt, quality, face):
+        super().__init__()
+        self.files, self.scale = files, scale
+        self.fmt, self.quality, self.face = fmt, quality, face
+
+    @Slot()
+    def run(self):
         try:
-            root = TkinterDnD.Tk()
-            return root, True
-        except Exception:
-            pass
-    return Tk(), False
+            self.status.emit("Загрузка модели…")
+            from upscaler.engine import UpscaleEngine
+            engine = UpscaleEngine(scale=self.scale, face_enhance=self.face, tile=512)
+            self.status.emit(f"Модель загружена · {engine.device}")
+            total = len(self.files)
+            last_dir = None
+            for i, f in enumerate(self.files):
+                self.status.emit(f"Обработка: {Path(f).name}")
+                out = make_output_path(Path(f), None, self.scale, self.fmt)
+                last_dir = out.parent
+                try:
+                    ow, oh = engine.upscale(Path(f), out, quality=self.quality)
+                    self.file_done.emit(str(f), f"✓ {ow}×{oh}")
+                except Exception as e:
+                    self.file_fail.emit(str(f), "✗ ошибка")
+                    self.status.emit(f"Ошибка на {Path(f).name}: {e}")
+                self.progress.emit((i + 1) / total)
+            self.finished.emit(total, str(last_dir) if last_dir else "")
+        except Exception as e:
+            self.error.emit(f"{e}\n{traceback.format_exc()}")
 
 
-class UpscalerApp:
+def _rounded_pix(path: Path, size=44, radius=11) -> QPixmap | None:
+    src = QPixmap(str(path))
+    if src.isNull():
+        return None
+    src = src.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+    x = (src.width() - size) // 2
+    y = (src.height() - size) // 2
+    src = src.copy(x, y, size, size)
+    out = QPixmap(size, size)
+    out.fill(Qt.transparent)
+    p = QPainter(out)
+    p.setRenderHint(QPainter.Antialiasing)
+    path_ = QPainterPath()
+    path_.addRoundedRect(0, 0, size, size, radius, radius)
+    p.setClipPath(path_)
+    p.drawPixmap(0, 0, src)
+    p.end()
+    return out
+
+
+def _shadow(widget, blur=22, dy=3, alpha=28):
+    eff = QGraphicsDropShadowEffect(widget)
+    eff.setBlurRadius(blur)
+    eff.setXOffset(0)
+    eff.setYOffset(dy)
+    eff.setColor(QColor(20, 30, 60, alpha))
+    widget.setGraphicsEffect(eff)
+
+
+class FileRow(QWidget):
+    def __init__(self, path: Path, info: str):
+        super().__init__()
+        self.setObjectName("fileRow")
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(10, 8, 14, 8)
+        lay.setSpacing(12)
+        thumb = QLabel()
+        thumb.setFixedSize(44, 44)
+        pm = _rounded_pix(path)
+        if pm:
+            thumb.setPixmap(pm)
+        lay.addWidget(thumb)
+        col = QVBoxLayout()
+        col.setSpacing(2)
+        name = QLabel(path.name)
+        name.setObjectName("fileName")
+        dim = QLabel(info)
+        dim.setObjectName("fileDim")
+        col.addWidget(name)
+        col.addWidget(dim)
+        lay.addLayout(col, 1)
+        self.status = QLabel("")
+        self.status.setObjectName("fileStatus")
+        lay.addWidget(self.status)
+
+    def set_status(self, text, color):
+        self.status.setText(text)
+        self.status.setStyleSheet(f"font-size:12px; font-weight:700; color:{color};")
+
+
+class MainWindow(QWidget):
     def __init__(self):
-        self.root, self.dnd_enabled = _make_root()
-        self.root.title("Upscaler")
-        self.root.geometry("640x800")
-        self.root.minsize(600, 740)
-        self.root.configure(bg=WIN)
-
-        self._init_style()
+        super().__init__()
+        self.setObjectName("window")
+        self.setWindowTitle("Upscaler")
+        self.resize(640, 820)
+        self.setMinimumSize(600, 760)
+        self.setAcceptDrops(True)
 
         self.files: list[Path] = []
-        self.row_ids: dict[str, str] = {}
-        self._thumbs: dict[str, ImageTk.PhotoImage] = {}
+        self.rows: dict[str, FileRow] = {}
         self.last_output_dir: Path | None = None
-        self.event_queue: queue.Queue = queue.Queue()
         self.processing = False
+        self.thread = None
+        self.worker = None
 
-        self._build_ui()
-        self.root.after(100, self._poll_events)
+        self._build()
+        self.setStyleSheet(STYLE)
 
-    # ------------------------------------------------------------- стиль
-    def _init_style(self):
-        st = ttk.Style()
-        st.theme_use("clam")
-
-        st.configure(".", background=WIN, foreground=TEXT, font=(FONT_TX, 13))
-        st.configure("Win.TFrame", background=WIN)
-        st.configure("Card.TFrame", background=CARD)
-        st.configure("Row.TFrame", background=ROW)
-
-        st.configure("Title.TLabel", background=WIN, foreground=TEXT, font=(FONT, 26, "bold"))
-        st.configure("Sub.TLabel", background=WIN, foreground=MUTED, font=(FONT_TX, 13))
-        st.configure("Card.TLabel", background=CARD, foreground=TEXT, font=(FONT_TX, 13))
-        st.configure("CardMuted.TLabel", background=CARD, foreground=MUTED, font=(FONT_TX, 12))
-        st.configure("Status.TLabel", background=WIN, foreground=MUTED, font=(FONT_TX, 12))
-
-        # Акцентная кнопка
-        st.configure("Accent.TButton", background=ACCENT, foreground="#FFFFFF",
-                     font=(FONT, 15, "bold"), borderwidth=0, focuscolor=ACCENT,
-                     padding=(16, 12))
-        st.map("Accent.TButton",
-               background=[("pressed", ACCENT_HV), ("active", ACCENT_HV), ("disabled", "#A9C2F4")],
-               foreground=[("disabled", "#EAF0FC")])
-
-        # Вторичная кнопка
-        st.configure("Secondary.TButton", background=CARD, foreground=TEXT,
-                     font=(FONT_TX, 13), borderwidth=1, padding=(12, 8), relief="solid")
-        st.map("Secondary.TButton",
-               background=[("active", "#EEF1F5")], bordercolor=[("!disabled", BORDER)])
-
-        # Призрачная кнопка
-        st.configure("Ghost.TButton", background=WIN, foreground=MUTED,
-                     font=(FONT_TX, 13), borderwidth=0, padding=(10, 8))
-        st.map("Ghost.TButton", background=[("active", "#E3E6EB")])
-
-        # Переключатель масштаба (Toolbutton)
-        st.configure("Seg.Toolbutton", background=CARD, foreground=TEXT,
-                     font=(FONT_TX, 13, "bold"), borderwidth=1, padding=(18, 6), relief="solid")
-        st.map("Seg.Toolbutton",
-               background=[("selected", ACCENT), ("active", "#EEF1F5")],
-               foreground=[("selected", "#FFFFFF")],
-               bordercolor=[("!disabled", BORDER)])
-
-        st.configure("TCheckbutton", background=CARD, foreground=TEXT, font=(FONT_TX, 13))
-        st.map("TCheckbutton", background=[("active", CARD)])
-
-        st.configure("TCombobox", fieldbackground=ROW, background=ROW,
-                     foreground=TEXT, arrowcolor=TEXT, borderwidth=0, padding=6)
-        st.map("TCombobox", fieldbackground=[("readonly", ROW)])
-
-        st.configure("Accent.Horizontal.TProgressbar",
-                     troughcolor=BORDER, background=ACCENT, borderwidth=0, thickness=8)
-
-        # Список файлов
-        st.configure("Treeview", background=CARD, fieldbackground=CARD, foreground=TEXT,
-                     borderwidth=0, rowheight=52, font=(FONT_TX, 12))
-        st.configure("Treeview.Heading", background=CARD, foreground=MUTED,
-                     font=(FONT_TX, 11), borderwidth=0, relief="flat")
-        st.map("Treeview", background=[("selected", "#E8F0FE")],
-               foreground=[("selected", TEXT)])
-
-    # ------------------------------------------------------------- разметка
-    def _build_ui(self):
-        m = ttk.Frame(self.root, style="Win.TFrame", padding=22)
-        m.pack(fill="both", expand=True)
-        m.columnconfigure(0, weight=1)
-        m.rowconfigure(5, weight=1)
+    # ------------------------------------------------------------- UI
+    def _build(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(22, 20, 22, 20)
+        root.setSpacing(0)
 
         # заголовок
-        head = ttk.Frame(m, style="Win.TFrame")
-        head.grid(row=0, column=0, sticky="ew")
-        head.columnconfigure(0, weight=1)
-        ttk.Label(head, text="Upscaler", style="Title.TLabel").grid(row=0, column=0, sticky="w")
-        badge = tk.Label(head, text=" Real-ESRGAN ", bg="#E6EEFE", fg=ACCENT,
-                         font=(FONT_TX, 11, "bold"), padx=6, pady=3)
-        badge.grid(row=0, column=1, sticky="e")
-        ttk.Label(m, text="Увеличение разрешения фото с восстановлением чёткости",
-                  style="Sub.TLabel").grid(row=1, column=0, sticky="w", pady=(2, 16))
+        top = QHBoxLayout()
+        title = QLabel("Upscaler"); title.setObjectName("title")
+        badge = QLabel("Real-ESRGAN"); badge.setObjectName("badge")
+        top.addWidget(title); top.addStretch(1); badge.setAlignment(Qt.AlignVCenter)
+        top.addWidget(badge)
+        root.addLayout(top)
+        sub = QLabel("Увеличение разрешения фото с восстановлением чёткости")
+        sub.setObjectName("subtitle")
+        root.addWidget(sub)
+        root.addSpacing(16)
 
         # зона перетаскивания
-        self.drop = tk.Frame(m, bg=DROP_BG, highlightbackground=BORDER,
-                             highlightthickness=2, height=148)
-        self.drop.grid(row=2, column=0, sticky="ew")
-        self.drop.grid_propagate(False)
-        self.drop.columnconfigure(0, weight=1)
-        self.drop.rowconfigure(0, weight=1)
-        self.drop.rowconfigure(3, weight=1)
-
-        chip = tk.Label(self.drop, text="↑", bg="#E1ECFE", fg=ACCENT,
-                        font=(FONT, 22, "bold"), width=3, height=1)
-        chip.grid(row=1, column=0, pady=(0, 4))
-        title = "Перетащите фото или папку сюда" if self.dnd_enabled \
-            else "Нажмите, чтобы выбрать фото или папку"
-        self.drop_title = tk.Label(self.drop, text=title, bg=DROP_BG, fg=TEXT,
-                                   font=(FONT_TX, 14, "bold"))
-        self.drop_title.grid(row=2, column=0)
-        sub = "или нажмите, чтобы выбрать" if self.dnd_enabled else "JPG · PNG · WebP · TIFF · BMP"
-        tk.Label(self.drop, text=sub, bg=DROP_BG, fg=MUTED,
-                 font=(FONT_TX, 12)).grid(row=3, column=0, sticky="n")
-
-        for w in (self.drop, chip, self.drop_title):
-            w.bind("<Button-1>", lambda e: self._choose_files())
-        if self.dnd_enabled:
-            self._register_dnd()
+        self.drop = QFrame(); self.drop.setObjectName("drop")
+        self.drop.setFixedHeight(132)
+        self.drop.setProperty("hover", "false")
+        self.drop.mousePressEvent = lambda e: self._choose_files()
+        self.drop.setCursor(Qt.PointingHandCursor)
+        dl = QVBoxLayout(self.drop); dl.setAlignment(Qt.AlignCenter); dl.setSpacing(4)
+        chip = QLabel("↑"); chip.setObjectName("dropChip"); chip.setAlignment(Qt.AlignCenter)
+        dl.addWidget(chip, 0, Qt.AlignCenter)
+        dt = QLabel("Перетащите фото или папку сюда"); dt.setObjectName("dropTitle")
+        dt.setAlignment(Qt.AlignCenter); dl.addWidget(dt)
+        ds = QLabel("или нажмите, чтобы выбрать"); ds.setObjectName("dropSub")
+        ds.setAlignment(Qt.AlignCenter); dl.addWidget(ds)
+        root.addWidget(self.drop)
+        root.addSpacing(12)
 
         # кнопки выбора
-        acts = ttk.Frame(m, style="Win.TFrame")
-        acts.grid(row=3, column=0, sticky="ew", pady=(12, 0))
-        acts.columnconfigure(2, weight=1)
-        ttk.Button(acts, text="Выбрать файлы", style="Secondary.TButton",
-                   command=self._choose_files, takefocus=False).grid(row=0, column=0)
-        ttk.Button(acts, text="Выбрать папку", style="Secondary.TButton",
-                   command=self._choose_folder, takefocus=False).grid(row=0, column=1, padx=(8, 0))
-        ttk.Button(acts, text="Очистить", style="Ghost.TButton",
-                   command=self._clear_files, takefocus=False).grid(row=0, column=3, sticky="e")
+        acts = QHBoxLayout()
+        b1 = QPushButton("Выбрать файлы"); b1.setObjectName("secondary")
+        b1.setCursor(Qt.PointingHandCursor); b1.clicked.connect(self._choose_files)
+        b2 = QPushButton("Выбрать папку"); b2.setObjectName("secondary")
+        b2.setCursor(Qt.PointingHandCursor); b2.clicked.connect(self._choose_folder)
+        b3 = QPushButton("Очистить"); b3.setObjectName("ghost")
+        b3.setCursor(Qt.PointingHandCursor); b3.clicked.connect(self._clear)
+        acts.addWidget(b1); acts.addWidget(b2); acts.addStretch(1); acts.addWidget(b3)
+        root.addLayout(acts)
+        root.addSpacing(14)
 
         # настройки
-        card = tk.Frame(m, bg=CARD, highlightbackground=BORDER, highlightthickness=1)
-        card.grid(row=4, column=0, sticky="ew", pady=(14, 0))
-        card.columnconfigure(1, weight=1)
-        pad = dict(padx=16, pady=9)
+        card = QFrame(); card.setObjectName("card")
+        g = QGridLayout(card); g.setContentsMargins(16, 14, 16, 14)
+        g.setHorizontalSpacing(12); g.setVerticalSpacing(12); g.setColumnStretch(1, 1)
 
-        tk.Label(card, text="Увеличение", bg=CARD, fg=TEXT, font=(FONT_TX, 13)).grid(
-            row=0, column=0, sticky="w", **pad)
-        seg = ttk.Frame(card, style="Card.TFrame")
-        seg.grid(row=0, column=1, sticky="e", padx=16, pady=9)
-        self.scale_var = StringVar(value="4x")
+        g.addWidget(self._rl("Увеличение"), 0, 0, Qt.AlignLeft)
+        seg = QHBoxLayout(); seg.setSpacing(0)
+        self.scale_group = QButtonGroup(self)
         for i, val in enumerate(("2x", "4x")):
-            ttk.Radiobutton(seg, text=val, value=val, variable=self.scale_var,
-                            style="Seg.Toolbutton", takefocus=False,
-                            command=self._render_rows).grid(row=0, column=i)
+            b = QPushButton(val); b.setCheckable(True); b.setCursor(Qt.PointingHandCursor)
+            b.setObjectName("seg")
+            b.setProperty("side", "L" if i == 0 else "R")
+            self.scale_group.addButton(b, i)
+            seg.addWidget(b)
+            if val == "4x":
+                b.setChecked(True)
+        self.scale_group.buttonClicked.connect(lambda *_: self._render())
+        segw = QWidget(); segw.setLayout(seg)
+        g.addWidget(segw, 0, 1, Qt.AlignRight)
 
-        tk.Label(card, text="Формат", bg=CARD, fg=TEXT, font=(FONT_TX, 13)).grid(
-            row=1, column=0, sticky="w", **pad)
-        self.format_var = StringVar(value=FORMATS[0])
-        ttk.Combobox(card, textvariable=self.format_var, values=FORMATS, state="readonly",
-                     width=16).grid(row=1, column=1, sticky="e", **pad)
+        g.addWidget(self._rl("Формат"), 1, 0, Qt.AlignLeft)
+        self.format_cb = QComboBox(); self.format_cb.addItems(FORMATS)
+        g.addWidget(self.format_cb, 1, 1, Qt.AlignRight)
 
-        tk.Label(card, text="Качество", bg=CARD, fg=TEXT, font=(FONT_TX, 13)).grid(
-            row=2, column=0, sticky="w", **pad)
-        self.quality_var = StringVar(value=QUALITIES[0])
-        ttk.Combobox(card, textvariable=self.quality_var, values=QUALITIES, state="readonly",
-                     width=16).grid(row=2, column=1, sticky="e", **pad)
+        g.addWidget(self._rl("Качество"), 2, 0, Qt.AlignLeft)
+        self.quality_cb = QComboBox(); self.quality_cb.addItems(QUALITIES)
+        g.addWidget(self.quality_cb, 2, 1, Qt.AlignRight)
 
-        tk.Label(card, text="Улучшать лица", bg=CARD, fg=TEXT, font=(FONT_TX, 13)).grid(
-            row=3, column=0, sticky="w", **pad)
-        self.face_var = BooleanVar(value=False)
-        ttk.Checkbutton(card, text="GFPGAN", variable=self.face_var,
-                        takefocus=False).grid(row=3, column=1, sticky="e", **pad)
+        g.addWidget(self._rl("Улучшать лица"), 3, 0, Qt.AlignLeft)
+        self.face_cb = QCheckBox("GFPGAN")
+        g.addWidget(self.face_cb, 3, 1, Qt.AlignRight)
+        root.addWidget(card)
+        root.addSpacing(14)
 
         # список файлов
-        wrap = tk.Frame(m, bg=CARD, highlightbackground=BORDER, highlightthickness=1)
-        wrap.grid(row=5, column=0, sticky="nsew", pady=(14, 0))
-        wrap.columnconfigure(0, weight=1)
-        wrap.rowconfigure(0, weight=1)
-        self.tree = ttk.Treeview(wrap, columns=("info", "status"), show="tree headings",
-                                 selectmode="none")
-        self.tree.heading("#0", text="  Файл")
-        self.tree.heading("info", text="Размер")
-        self.tree.heading("status", text="")
-        self.tree.column("#0", width=280, anchor="w")
-        self.tree.column("info", width=190, anchor="w")
-        self.tree.column("status", width=90, anchor="e")
-        self.tree.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
-        sb = ttk.Scrollbar(wrap, orient="vertical", command=self.tree.yview)
-        sb.grid(row=0, column=1, sticky="ns")
-        self.tree.configure(yscrollcommand=sb.set)
-        self.tree.tag_configure("ok", foreground=OK)
-        self.tree.tag_configure("err", foreground=ERR)
-        self.tree.tag_configure("wait", foreground=MUTED)
+        self.list = QListWidget(); self.list.setObjectName("list")
+        self.list.setIconSize(QSize(40, 40))
+        self.list.setSelectionMode(QListWidget.NoSelection)
+        self.list.setFocusPolicy(Qt.NoFocus)
+        root.addWidget(self.list, 1)
+        root.addSpacing(14)
 
         # прогресс + статус
-        self.progress = ttk.Progressbar(m, style="Accent.Horizontal.TProgressbar",
-                                        mode="determinate", maximum=1.0)
-        self.progress.grid(row=6, column=0, sticky="ew", pady=(16, 8))
-        self.status_var = StringVar(value="Готов к работе")
-        ttk.Label(m, textvariable=self.status_var, style="Status.TLabel").grid(
-            row=7, column=0, sticky="w")
+        self.pbar = QProgressBar(); self.pbar.setRange(0, 1000); self.pbar.setValue(0)
+        self.pbar.setTextVisible(False)
+        root.addWidget(self.pbar)
+        root.addSpacing(6)
+        self.status = QLabel("Готов к работе"); self.status.setObjectName("status")
+        root.addWidget(self.status)
+        root.addSpacing(12)
 
         # кнопки запуска
-        self.run_btn = ttk.Button(m, text="Увеличить", style="Accent.TButton",
-                                  command=self._start, takefocus=False)
-        self.run_btn.grid(row=8, column=0, sticky="ew", pady=(12, 0))
-        self.open_btn = ttk.Button(m, text="Открыть папку с результатом",
-                                   style="Secondary.TButton", command=self._open_output,
-                                   takefocus=False)
-        self.open_btn.grid(row=9, column=0, sticky="ew", pady=(8, 0))
-        self.open_btn.grid_remove()
+        self.run_btn = QPushButton("Увеличить"); self.run_btn.setObjectName("accent")
+        self.run_btn.setCursor(Qt.PointingHandCursor); self.run_btn.clicked.connect(self._start)
+        root.addWidget(self.run_btn)
+        self.open_btn = QPushButton("Открыть папку с результатом")
+        self.open_btn.setObjectName("secondary"); self.open_btn.setCursor(Qt.PointingHandCursor)
+        self.open_btn.clicked.connect(self._open_output); self.open_btn.hide()
+        root.addSpacing(8); root.addWidget(self.open_btn)
 
-        self._render_rows()
+        _shadow(self.drop)
+        _shadow(card)
+
+        self._render()
+
+    def _rl(self, text):
+        lbl = QLabel(text); lbl.setObjectName("rowLabel"); return lbl
 
     # --------------------------------------------------------- drag&drop
-    def _register_dnd(self):
-        self.drop.drop_target_register(DND_FILES)
-        self.drop.dnd_bind("<<Drop>>", self._on_drop)
-        self.drop.dnd_bind("<<DropEnter>>", lambda e: self._hover(True))
-        self.drop.dnd_bind("<<DropLeave>>", lambda e: self._hover(False))
+    def dragEnterEvent(self, e):
+        if e.mimeData().hasUrls():
+            e.acceptProposedAction()
+            self.drop.setProperty("hover", "true")
+            self.drop.style().unpolish(self.drop); self.drop.style().polish(self.drop)
 
-    def _hover(self, active):
-        self.drop.configure(highlightbackground=ACCENT if active else BORDER,
-                            highlightthickness=2)
+    def dragLeaveEvent(self, e):
+        self.drop.setProperty("hover", "false")
+        self.drop.style().unpolish(self.drop); self.drop.style().polish(self.drop)
 
-    def _on_drop(self, event):
-        self._hover(False)
+    def dropEvent(self, e):
+        self.drop.setProperty("hover", "false")
+        self.drop.style().unpolish(self.drop); self.drop.style().polish(self.drop)
         if self.processing:
             return
-        self._add_paths([Path(p) for p in self.root.tk.splitlist(event.data)])
+        paths = [Path(u.toLocalFile()) for u in e.mimeData().urls() if u.toLocalFile()]
+        if paths:
+            self._add(paths)
 
     # ------------------------------------------------------------- файлы
     def _choose_files(self):
         if self.processing:
             return
-        paths = filedialog.askopenfilenames(
-            title="Выберите изображения",
-            filetypes=[("Изображения", "*.jpg *.jpeg *.png *.webp *.tiff *.tif *.bmp")])
-        if paths:
-            self._add_paths([Path(p) for p in paths])
+        files, _ = QFileDialog.getOpenFileNames(self, "Выберите изображения", "",
+                                                f"Изображения ({' '.join(EXTS)})")
+        if files:
+            self._add([Path(p) for p in files])
 
     def _choose_folder(self):
         if self.processing:
             return
-        folder = filedialog.askdirectory(title="Выберите папку с изображениями")
+        folder = QFileDialog.getExistingDirectory(self, "Выберите папку с изображениями")
         if folder:
-            self._add_paths([Path(folder)])
+            self._add([Path(folder)])
 
-    def _clear_files(self):
+    def _clear(self):
         if self.processing:
             return
         self.files = []
-        self._render_rows()
+        self._render()
 
-    def _add_paths(self, paths):
+    def _add(self, paths):
         collected = []
         for p in paths:
             collected.extend(collect_images(p))
         seen = {str(f) for f in self.files}
         for f in collected:
             if str(f) not in seen:
-                seen.add(str(f))
-                self.files.append(f)
-        self._render_rows()
+                seen.add(str(f)); self.files.append(f)
+        self._render()
 
-    def _thumb(self, path: Path):
-        try:
-            img = Image.open(path).convert("RGB")
-            img = ImageOps.fit(img, (38, 38), Image.LANCZOS)
-            photo = ImageTk.PhotoImage(img)
-            self._thumbs[str(path)] = photo
-            return photo
-        except Exception:
-            return None
+    def _scale(self):
+        return 2 if self.scale_group.checkedId() == 0 else 4
 
-    def _render_rows(self):
-        self.tree.delete(*self.tree.get_children())
-        self.row_ids.clear()
-        self._thumbs.clear()
-
+    def _render(self):
+        self.list.clear()
+        self.rows.clear()
         if not self.files:
-            self.status_var.set("Готов к работе")
+            self.status.setText("Готов к работе")
+            it = QListWidgetItem()
+            it.setFlags(Qt.NoItemFlags)
+            it.setSizeHint(QSize(0, 60))
+            self.list.addItem(it)
+            ph = QLabel("Файлы не выбраны"); ph.setObjectName("empty")
+            ph.setAlignment(Qt.AlignCenter)
+            self.list.setItemWidget(it, ph)
             return
-
-        scale = int(self.scale_var.get().replace("x", ""))
+        scale = self._scale()
         for f in self.files:
             try:
                 w, h, _ = get_image_info(f)
-                info = f"{w}×{h} → {w*scale}×{h*scale}"
+                info = f"{w}×{h}  →  {w*scale}×{h*scale}"
             except Exception:
                 info = "—"
-            thumb = self._thumb(f)
-            rid = self.tree.insert("", "end", text="  " + f.name, image=thumb,
-                                   values=(info, ""), tags=("wait",))
-            self.row_ids[str(f)] = rid
-        self.status_var.set(f"Выбрано файлов: {len(self.files)}")
+            it = QListWidgetItem()
+            it.setFlags(Qt.NoItemFlags)
+            it.setSizeHint(QSize(0, 64))
+            self.list.addItem(it)
+            row = FileRow(f, info)
+            self.list.setItemWidget(it, row)
+            self.rows[str(f)] = row
+        self.status.setText(f"Выбрано файлов: {len(self.files)}")
 
     # ------------------------------------------------------- обработка
     def _start(self):
         if self.processing:
             return
         if not self.files:
-            self.status_var.set("Сначала выберите изображения")
+            self.status.setText("Сначала выберите изображения")
             return
         self.processing = True
-        self.open_btn.grid_remove()
-        self.run_btn.configure(text="Обработка…", state="disabled")
-        self.progress.configure(value=0)
+        self.open_btn.hide()
+        self.run_btn.setEnabled(False); self.run_btn.setText("Обработка…")
+        self.pbar.setValue(0)
 
-        scale = int(self.scale_var.get().replace("x", ""))
-        fmt = FORMAT_MAP[self.format_var.get()]
-        quality = int(self.quality_var.get().replace("%", ""))
-        face = self.face_var.get()
-        files = list(self.files)
-        threading.Thread(target=self._worker,
-                         args=(files, scale, fmt, quality, face), daemon=True).start()
+        self.thread = QThread()
+        self.worker = Worker(list(map(str, self.files)), self._scale(),
+                             FORMAT_MAP[self.format_cb.currentText()],
+                             int(self.quality_cb.currentText().replace("%", "")),
+                             self.face_cb.isChecked())
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.worker.status.connect(self.status.setText)
+        self.worker.progress.connect(lambda v: self.pbar.setValue(int(v * 1000)))
+        self.worker.file_done.connect(lambda k, t: self._mark(k, t, "#157F3B"))
+        self.worker.file_fail.connect(lambda k, t: self._mark(k, t, "#CF222E"))
+        self.worker.finished.connect(self._finished)
+        self.worker.error.connect(self._error)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.error.connect(self.thread.quit)
+        self.thread.start()
 
-    def _worker(self, files, scale, fmt, quality, face):
-        q = self.event_queue
-        try:
-            q.put(("status", "Загрузка модели…"))
-            from upscaler.engine import UpscaleEngine
-            engine = UpscaleEngine(scale=scale, face_enhance=face, tile=512)
-            q.put(("status", f"Модель загружена · {engine.device}"))
+    def _mark(self, key, text, color):
+        row = self.rows.get(key)
+        if row:
+            row.set_status(text, color)
 
-            total = len(files)
-            last_dir = None
-            for i, f in enumerate(files):
-                q.put(("current", str(f)))
-                out = make_output_path(f, None, scale, fmt)
-                last_dir = out.parent
-                try:
-                    ow, oh = engine.upscale(f, out, quality=quality)
-                    q.put(("done", (str(f), f"✓ {ow}×{oh}")))
-                except Exception as e:
-                    q.put(("fail", (str(f), "✗ ошибка")))
-                    q.put(("status", f"Ошибка на {Path(f).name}: {e}"))
-                q.put(("progress", (i + 1) / total))
-            q.put(("finished", (total, str(last_dir) if last_dir else "")))
-        except Exception as e:
-            q.put(("error", f"{e}\n{traceback.format_exc()}"))
+    def _finished(self, total, last_dir):
+        self.processing = False
+        self.run_btn.setEnabled(True); self.run_btn.setText("Увеличить")
+        self.pbar.setValue(1000)
+        self.status.setText(f"Готово! Обработано: {total}")
+        if last_dir:
+            self.last_output_dir = Path(last_dir)
+            self.open_btn.show()
 
-    def _poll_events(self):
-        try:
-            while True:
-                kind, payload = self.event_queue.get_nowait()
-                self._handle(kind, payload)
-        except queue.Empty:
-            pass
-        self.root.after(100, self._poll_events)
-
-    def _handle(self, kind, payload):
-        if kind == "status":
-            self.status_var.set(payload)
-        elif kind == "current":
-            self.status_var.set(f"Обработка: {Path(payload).name}")
-            if payload in self.row_ids:
-                self.tree.set(self.row_ids[payload], "status", "…")
-        elif kind == "progress":
-            self.progress.configure(value=payload)
-        elif kind == "done":
-            key, text = payload
-            if key in self.row_ids:
-                self.tree.set(self.row_ids[key], "status", text)
-                self.tree.item(self.row_ids[key], tags=("ok",))
-        elif kind == "fail":
-            key, text = payload
-            if key in self.row_ids:
-                self.tree.set(self.row_ids[key], "status", text)
-                self.tree.item(self.row_ids[key], tags=("err",))
-        elif kind == "finished":
-            total, last_dir = payload
-            self.processing = False
-            self.run_btn.configure(text="Увеличить", state="normal")
-            self.progress.configure(value=1.0)
-            self.status_var.set(f"Готово! Обработано: {total}")
-            if last_dir:
-                self.last_output_dir = Path(last_dir)
-                self.open_btn.grid()
-        elif kind == "error":
-            self.processing = False
-            self.run_btn.configure(text="Увеличить", state="normal")
-            self.status_var.set(f"Ошибка: {payload.splitlines()[0]}")
+    def _error(self, msg):
+        self.processing = False
+        self.run_btn.setEnabled(True); self.run_btn.setText("Увеличить")
+        self.status.setText(f"Ошибка: {msg.splitlines()[0]}")
 
     def _open_output(self):
         if self.last_output_dir and self.last_output_dir.exists():
+            import subprocess
             subprocess.run(["open", str(self.last_output_dir)], check=False)
-
-    def run(self):
-        self.root.mainloop()
 
 
 def main():
-    UpscalerApp().run()
+    app = QApplication(sys.argv)
+    app.setApplicationName("Upscaler")
+    win = MainWindow()
+    win.show()
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

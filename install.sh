@@ -64,7 +64,10 @@ pip install torch torchvision --quiet
 echo -e "${CYAN}Installing Real-ESRGAN and dependencies...${NC}"
 pip install basicsr realesrgan gfpgan click rich opencv-python-headless Pillow --quiet
 
-echo -e "${CYAN}Installing upscaler CLI...${NC}"
+echo -e "${CYAN}Installing GUI toolkit (PySide6)...${NC}"
+pip install "PySide6>=6.6" --quiet
+
+echo -e "${CYAN}Installing upscaler...${NC}"
 pip install -e "$SCRIPT_DIR" --quiet
 
 echo ""
@@ -75,7 +78,12 @@ echo ""
 echo -e "Activate the environment first:"
 echo -e "  ${CYAN}source $VENV_DIR/bin/activate${NC}"
 echo ""
-echo -e "Then use:"
+echo -e "Запустить приложение (GUI):"
+echo -e "  ${CYAN}upscaler-gui${NC}                   # окно с drag-and-drop"
+echo -e "Собрать .app для macOS:"
+echo -e "  ${CYAN}./build.sh${NC}                     # → dist/Upscaler.app"
+echo ""
+echo -e "Или через командную строку:"
 echo -e "  ${CYAN}upscale photo.jpg${NC}              # 4x upscale"
 echo -e "  ${CYAN}upscale photo.jpg -s 2${NC}         # 2x upscale"
 echo -e "  ${CYAN}upscale photo.jpg --face${NC}       # with face enhancement"

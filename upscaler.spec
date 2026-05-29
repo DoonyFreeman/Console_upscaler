@@ -10,11 +10,10 @@ datas = []
 binaries = []
 hiddenimports = []
 
-# Пакеты с динамическими импортами и data-файлами — собираем целиком
-# customtkinter — JSON-темы и шрифты; tkinterdnd2 — нативная библиотека tkdnd
+# Пакеты с динамическими импортами и data-файлами — собираем целиком.
+# PySide6 (Qt) подхватывается встроенным хуком PyInstaller автоматически.
 for pkg in ("basicsr", "realesrgan", "gfpgan", "facexlib",
-            "torchvision", "cv2", "skimage", "scipy",
-            "customtkinter", "tkinterdnd2"):
+            "torchvision", "cv2", "skimage", "scipy"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b
