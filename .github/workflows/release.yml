@@ -1,0 +1,59 @@
+name: Build & Release macOS app
+
+# Собирает Upscaler.app, упаковывает в DMG и прикладывает к релизу.
+# Запускается при пуше тега вида v* (например, v1.0.1) или вручную.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14          # Apple Silicon (arm64)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision
+          pip install basicsr realesrgan gfpgan
+          pip install click rich opencv-python-headless Pillow PySide6
+          pip install "pyinstaller>=6.0"
+          pip install -e .
+
+      - name: Build .app
+        run: pyinstaller upscaler.spec --clean --noconfirm
+
+      - name: Package DMG
+        run: |
+          chmod +x build_dmg.sh
+          ./build_dmg.sh
+
+      - name: Upload DMG to release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: dist/Upscaler.dmg
+          fail_on_unmatched_files: true
+          body: |
+            Фото-апскейлер на Real-ESRGAN для macOS (Apple Silicon).
+
+            **Установка:** скачайте `Upscaler.dmg`, перетащите Upscaler в «Программы»,
+            при первом запуске — правый клик → «Открыть» → «Открыть».
+
+      - name: Upload build artifact (для ручного запуска)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Upscaler-dmg
+          path: dist/Upscaler.dmg

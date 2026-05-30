@@ -4,6 +4,8 @@
 
 > Нативное приложение для macOS, которое увеличивает разрешение фотографий и восстанавливает чёткость с помощью нейросети Real-ESRGAN. HD → 4K без подписок и без облака — всё локально, на вашем железе.
 
+[![Latest release](https://img.shields.io/github/v/release/DoonyFreeman/Console_upscaler?logo=github)](https://github.com/DoonyFreeman/Console_upscaler/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/DoonyFreeman/Console_upscaler/total?logo=github&label=downloads)](https://github.com/DoonyFreeman/Console_upscaler/releases)
 [![Python](https://img.shields.io/badge/python-3.10--3.12-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/macOS-Apple%20Silicon-black?logo=apple)](https://developer.apple.com/metal/pytorch/)
 [![UI](https://img.shields.io/badge/UI-PySide6%20(Qt)-41cd52?logo=qt&logoColor=white)](https://doc.qt.io/qtforpython/)
