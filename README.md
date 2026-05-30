@@ -1,6 +1,8 @@
 # 🔍 Upscaler
 
-> Нативное приложение для macOS, которое увеличивает разрешение фотографий и восстанавливает чёткость с помощью нейросети Real-ESRGAN. HD → 4K без подписок и без облака — всё локально, на вашем железе.
+**English** | [Русский](README.ru.md)
+
+> A native macOS app that upscales photos and restores sharpness using the Real-ESRGAN neural network. HD → 4K, no subscriptions and no cloud — everything runs locally on your own hardware.
 
 [![Python](https://img.shields.io/badge/python-3.10--3.12-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/macOS-Apple%20Silicon-black?logo=apple)](https://developer.apple.com/metal/pytorch/)
@@ -8,143 +10,143 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 <p align="center">
-  <img src="docs/images/app_main.png" alt="Окно приложения Upscaler" width="420">
+  <img src="docs/images/app_main.png" alt="Upscaler app window" width="420">
 </p>
 
-Перетащите фото в окно, выберите увеличение (2x или 4x) — и приложение прогонит его через [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN), восстанавливая детали и резкость. Портреты можно дополнительно докрутить через [GFPGAN](https://github.com/TencentARC/GFPGAN). Есть и графический интерфейс, и CLI.
+Drag a photo into the window, pick the scale (2x or 4x) — and the app runs it through [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN), restoring detail and sharpness. Portraits can be further refined with [GFPGAN](https://github.com/TencentARC/GFPGAN). Comes with both a GUI and a CLI.
 
 ---
 
-## ✨ Возможности
+## ✨ Features
 
-- 🖥 **Нативное приложение для macOS** — скачал `.dmg`, перетащил в «Программы», пользуешься
-- 🖱 **Drag-and-drop** — перетаскивайте фото и папки прямо в окно
-- 🖼 **2x / 4x увеличение** на Real-ESRGAN (`x2plus` / `x4plus`)
-- 👤 **Восстановление лиц** через GFPGAN (галочка в настройках)
-- 📁 **Пакетная обработка** — целая папка за раз
-- 🍎 **Apple Silicon MPS** из коробки (Metal-ускорение)
-- 🎨 Форматы на выходе — **JPG / PNG / WebP** + настройка качества
-- ⌨️ **CLI в комплекте** — для скриптов и автоматизации
+- 🖥 **Native macOS app** — download the `.dmg`, drag it to Applications, done
+- 🖱 **Drag-and-drop** — drop photos and folders straight into the window
+- 🖼 **2x / 4x upscaling** with Real-ESRGAN (`x2plus` / `x4plus`)
+- 👤 **Face restoration** via GFPGAN (a checkbox in settings)
+- 📁 **Batch processing** — a whole folder at once
+- 🍎 **Apple Silicon MPS** out of the box (Metal acceleration)
+- 🎨 Output formats — **JPG / PNG / WebP** + quality control
+- ⌨️ **CLI included** — for scripts and automation
 
 ---
 
-## 🖼 До и после
+## 🖼 Before & after
 
-| До | После (4x) |
+| Before | After (4x) |
 |:---:|:---:|
 | <img src="docs/images/before.jpg" width="360"> | <img src="docs/images/after.jpg" width="360"> |
 | 720×480 | 2880×1920 |
 
-| Портрет до | Портрет после (с GFPGAN) |
+| Portrait before | Portrait after (with GFPGAN) |
 |:---:|:---:|
 | <img src="docs/images/portrait_before.jpg" width="280"> | <img src="docs/images/portrait_after.jpg" width="280"> |
 
 ---
 
-## 📥 Установка
+## 📥 Installation
 
-### Требования
+### Requirements
 
-- Mac на **Apple Silicon** (M1/M2/M3/M4)
-- **macOS 12** или новее
-- Интернет при **первом** запуске (скачать модели ~130 МБ)
+- A Mac with **Apple Silicon** (M1/M2/M3/M4)
+- **macOS 12** or newer
+- Internet on **first** launch (to download the models, ~130 MB)
 
-### Вариант 1. Скачать готовое приложение (проще всего)
+### Option 1. Download the ready-made app (easiest)
 
-1. Зайди на страницу [**Releases**](https://github.com/DoonyFreeman/Console_upscaler/releases/latest) и скачай **`Upscaler.dmg`**.
-2. Открой `Upscaler.dmg` двойным кликом.
-3. **Перетащи `Upscaler` в папку «Программы»** (Applications).
-4. **Первый запуск:** в «Программах» сделай **правый клик** по `Upscaler` → **«Открыть»** → ещё раз **«Открыть»**.
+1. Go to the [**Releases**](https://github.com/DoonyFreeman/Console_upscaler/releases/latest) page and download **`Upscaler.dmg`**.
+2. Open `Upscaler.dmg` with a double-click.
+3. **Drag `Upscaler` into the Applications folder.**
+4. **First launch:** in Applications, **right-click** `Upscaler` → **Open** → **Open** again.
 
-> ⚠️ Шаг 4 нужен только **один раз**. Приложение не подписано платным сертификатом Apple, поэтому при обычном двойном клике macOS показывает предупреждение. Через правый клик → «Открыть» система запомнит разрешение.
+> ⚠️ Step 4 is only needed **once**. The app isn't signed with a paid Apple certificate, so a plain double-click shows a warning. Right-click → Open makes macOS remember the permission.
 >
-> Если пишет «повреждено», выполни один раз в Терминале:
+> If it says "damaged", run this once in Terminal:
 > ```bash
 > xattr -dr com.apple.quarantine /Applications/Upscaler.app
 > ```
 
-### Вариант 2. Собрать из исходников
+### Option 2. Build from source
 
 ```bash
 git clone https://github.com/DoonyFreeman/Console_upscaler.git
 cd Console_upscaler
-./install.sh        # окружение и зависимости (Python 3.10–3.12)
-./build.sh          # собирает dist/Upscaler.app
-./build_dmg.sh      # (опц.) упаковывает в dist/Upscaler.dmg
+./install.sh        # environment & dependencies (Python 3.10–3.12)
+./build.sh          # builds dist/Upscaler.app
+./build_dmg.sh      # (optional) packages it into dist/Upscaler.dmg
 ```
 
-> ⚠️ Нужен Python **3.10–3.12** (3.13+ пока не поддерживается из-за старого `basicsr`).
+> ⚠️ Requires Python **3.10–3.12** (3.13+ is not supported yet because of the old `basicsr`).
 
 ---
 
-## 🚀 Использование
+## 🚀 Usage
 
-### Приложение (GUI)
+### App (GUI)
 
-1. Перетащи фото или папку в окно (или нажми «Выбрать файлы / папку»).
-2. Настрой увеличение, формат, качество, при необходимости включи «Улучшать лица».
-3. Нажми **«Увеличить»**.
-4. По готовности — **«Открыть папку с результатом»**.
+1. Drag a photo or folder into the window (or click "Choose files / folder").
+2. Set the scale, format, quality, and optionally enable face restoration.
+3. Click **Upscale**.
+4. When done — **Open output folder**.
 
-Результаты сохраняются рядом с оригиналом с суффиксом `_4x` / `_2x`.
+Results are saved next to the original with a `_4x` / `_2x` suffix.
 
-| Выбор файлов | Обработка завершена |
+| Choosing files | Processing done |
 |:---:|:---:|
 | <img src="docs/images/app_main.png" width="340"> | <img src="docs/images/app_done.png" width="340"> |
 
-### Командная строка (CLI)
+### Command line (CLI)
 
 ```bash
-upscale photo.jpg                    # 4x по умолчанию → photo_4x.jpg
-upscale photo.jpg -s 2               # 2x — быстрее
-upscale photo.jpg -o result.png      # явный путь вывода
-upscale ./photos/                    # пакетно по всей папке
-upscale photo.jpg --face             # с восстановлением лица (GFPGAN)
+upscale photo.jpg                    # 4x by default → photo_4x.jpg
+upscale photo.jpg -s 2               # 2x — faster
+upscale photo.jpg -o result.png      # explicit output path
+upscale ./photos/                    # batch over a whole folder
+upscale photo.jpg --face             # with face restoration (GFPGAN)
 upscale photo.jpg --format webp --quality 90
-upscale photo.jpg --tile 256         # меньше тайл — меньше памяти
-upscale                              # интерактивный визард
+upscale photo.jpg --tile 256         # smaller tile — less memory
+upscale                              # interactive wizard
 ```
 
-| Флаг | По умолчанию | Что делает |
+| Flag | Default | What it does |
 |---|---|---|
-| `-s`, `--scale` | `4` | Кратность: `2` или `4` |
-| `-o`, `--output` | рядом с оригиналом | Путь к файлу или папке |
-| `--face` | выкл. | Включить GFPGAN для лиц |
-| `--format` | как у исходника | `jpg` / `png` / `webp` |
-| `--quality` | `95` | Качество JPEG/WebP, 1–100 |
-| `--tile` | `512` | Размер тайла; меньше = меньше памяти |
+| `-s`, `--scale` | `4` | Scale factor: `2` or `4` |
+| `-o`, `--output` | next to the original | Path to a file or folder |
+| `--face` | off | Enable GFPGAN for faces |
+| `--format` | same as input | `jpg` / `png` / `webp` |
+| `--quality` | `95` | JPEG/WebP quality, 1–100 |
+| `--tile` | `512` | Tile size; smaller = less memory |
 
-Поддерживаемые форматы на вход: `jpg`, `jpeg`, `png`, `webp`, `tiff`, `tif`, `bmp`.
-
----
-
-## 🧠 Как это работает
-
-Под капотом две нейросети:
-
-1. **Real-ESRGAN** (RRDBNet) — основной апскейлер. Для 4x используется `RealESRGAN_x4plus`, для 2x — `RealESRGAN_x2plus`. Картинка режется на тайлы (по умолчанию 512 px, чтобы хватало памяти), каждый прогоняется через сеть и склеивается обратно.
-2. **GFPGAN v1.3** — включается галочкой «Улучшать лица». Реконструирует именно лица: глаза, рот, кожу. Полезно для старых и групповых фото.
-
-Устройство выбирается автоматически: **MPS** (Metal) на Apple Silicon → **CUDA** → **CPU**. Веса моделей качаются с официальных релизов при первом запуске в `~/.upscaler/models/`.
+Supported input formats: `jpg`, `jpeg`, `png`, `webp`, `tiff`, `tif`, `bmp`.
 
 ---
 
-## 🛠 Стек
+## 🧠 How it works
 
-Python · PyTorch (MPS) · Real-ESRGAN · GFPGAN · **PySide6 (Qt)** для GUI · Click + Rich для CLI · Pillow · OpenCV · PyInstaller для сборки `.app`
+Two neural networks under the hood:
+
+1. **Real-ESRGAN** (RRDBNet) — the main upscaler. 4x uses `RealESRGAN_x4plus`, 2x uses `RealESRGAN_x2plus`. The image is split into tiles (512 px by default, to fit in memory), each is run through the network and stitched back together.
+2. **GFPGAN v1.3** — enabled by the "Restore faces" checkbox. Reconstructs faces specifically: eyes, mouth, skin. Great for old and group photos.
+
+The device is chosen automatically: **MPS** (Metal) on Apple Silicon → **CUDA** → **CPU**. Model weights are downloaded from the official releases on first launch into `~/.upscaler/models/`.
+
+---
+
+## 🛠 Stack
+
+Python · PyTorch (MPS) · Real-ESRGAN · GFPGAN · **PySide6 (Qt)** for the GUI · Click + Rich for the CLI · Pillow · OpenCV · PyInstaller for building the `.app`
 
 ```
 upscaler/
-├── gui.py        # Графический интерфейс на PySide6 (drag-and-drop, миниатюры)
-├── app.py        # Точка входа GUI
-├── cli.py        # CLI на Click (флаги, пакетная обработка)
-├── interactive.py# Интерактивный визард на Rich
-├── engine.py     # Обёртка над Real-ESRGAN + GFPGAN, выбор устройства
+├── gui.py        # PySide6 GUI (drag-and-drop, thumbnails)
+├── app.py        # GUI entry point
+├── cli.py        # Click CLI (flags, batch processing)
+├── interactive.py# Interactive wizard on Rich
+├── engine.py     # Real-ESRGAN + GFPGAN wrapper, device selection
 └── utils.py      # collect_images, make_output_path, get_image_info
-install.sh        # Установка окружения
-build.sh          # Сборка Upscaler.app (PyInstaller)
-build_dmg.sh      # Упаковка в DMG
-upscaler.spec     # Конфиг PyInstaller
+install.sh        # Environment setup
+build.sh          # Build Upscaler.app (PyInstaller)
+build_dmg.sh      # Package into a DMG
+upscaler.spec     # PyInstaller config
 ```
 
 ---
@@ -152,52 +154,52 @@ upscaler.spec     # Конфиг PyInstaller
 ## 🐛 FAQ
 
 <details>
-<summary><b>«Не удаётся открыть, разработчик не проверен»</b></summary>
+<summary><b>"Cannot be opened, developer cannot be verified"</b></summary>
 
-Приложение не подписано сертификатом Apple ($99/год). Сделай правый клик по приложению → «Открыть» → ещё раз «Открыть». Нужно один раз. Либо: `xattr -dr com.apple.quarantine /Applications/Upscaler.app`.
+The app isn't signed with an Apple certificate ($99/year). Right-click the app → Open → Open again. Needed once. Or: `xattr -dr com.apple.quarantine /Applications/Upscaler.app`.
 </details>
 
 <details>
-<summary><b>Можно ли отправить другу?</b></summary>
+<summary><b>Can I send it to a friend?</b></summary>
 
-Да, если у друга **Apple Silicon Mac**. Отправь ему `.dmg` (или ссылку на Releases). Первый запуск — через правый клик → «Открыть». На Intel-Маках текущая сборка не работает (нужна отдельная universal-сборка).
+Yes, if your friend has an **Apple Silicon Mac**. Send them the `.dmg` (or the Releases link). First launch is via right-click → Open. The current build does not run on Intel Macs (a separate universal build would be needed).
 </details>
 
 <details>
-<summary><b>Падает с нехваткой памяти / зависает</b></summary>
+<summary><b>Crashes with out-of-memory / hangs</b></summary>
 
-В CLI уменьши тайл: `upscale photo.jpg --tile 256` (или 128 для очень больших фото).
+In the CLI, reduce the tile size: `upscale photo.jpg --tile 256` (or 128 for very large photos).
 </details>
 
 <details>
-<summary><b>Медленно работает</b></summary>
+<summary><b>It's slow</b></summary>
 
-Проверь, что используется `mps` (Apple Silicon), а не `cpu`. На M-чипах MPS подхватывается сам, если PyTorch свежий.
+Make sure it uses `mps` (Apple Silicon), not `cpu`. On M-series chips MPS is picked up automatically if PyTorch is recent.
 </details>
 
 <details>
-<summary><b>Где модели? Как перекачать?</b></summary>
+<summary><b>Where are the models? How do I re-download?</b></summary>
 
-`~/.upscaler/models/`. Удали файл — он перекачается при следующем запуске.
+`~/.upscaler/models/`. Delete a file and it will be re-downloaded on the next run.
 </details>
 
 <details>
-<summary><b>install.sh ругается на Python 3.13</b></summary>
+<summary><b>install.sh complains about Python 3.13</b></summary>
 
-Real-ESRGAN тянет старый `basicsr`, несовместимый с 3.13. Поставь 3.11: `pyenv install 3.11.9` или `brew install python@3.11`, затем снова `./install.sh`.
+Real-ESRGAN pulls in the old `basicsr`, which isn't compatible with 3.13. Install 3.11: `pyenv install 3.11.9` or `brew install python@3.11`, then run `./install.sh` again.
 </details>
 
 ---
 
-## 🙏 Благодарности
+## 🙏 Acknowledgements
 
-- [xinntao/Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) — модель и архитектура
-- [TencentARC/GFPGAN](https://github.com/TencentARC/GFPGAN) — восстановление лиц
-- Команде PyTorch — за MPS-бэкенд
-- [Qt for Python (PySide6)](https://doc.qt.io/qtforpython/) — за надёжный GUI на macOS
+- [xinntao/Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) — the model and architecture
+- [TencentARC/GFPGAN](https://github.com/TencentARC/GFPGAN) — face restoration
+- The PyTorch team — for the MPS backend
+- [Qt for Python (PySide6)](https://doc.qt.io/qtforpython/) — for a reliable GUI on macOS
 
 ---
 
-## 📄 Лицензия
+## 📄 License
 
-[MIT](LICENSE). Не забудьте про лицензии моделей: Real-ESRGAN — BSD 3-Clause, GFPGAN — Apache 2.0.
+[MIT](LICENSE). Don't forget the model licenses: Real-ESRGAN — BSD 3-Clause, GFPGAN — Apache 2.0.
